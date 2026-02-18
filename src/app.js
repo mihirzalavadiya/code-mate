@@ -34,6 +34,19 @@ app.delete('/user/:id', (req, res) => {
   res.send({ message: `User with id ${userId} deleted successfully` });
 });
 
+app.get('/user/getAllUsers', (req, res) => {
+  throw new Error('MZ'); // Simulate an error
+});
+
+// write one api for error handling
+app.use('/', (err, req, res, next) => {
+  if (err) {
+    res.status(500).send({ message: 'Internal Server Error' });
+  } else {
+    res.send({ message: 'No error' });
+  }
+});
+
 app.listen(3000, () => {
   console.log('Server is running on port 3000');
 });
