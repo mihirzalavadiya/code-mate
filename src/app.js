@@ -27,6 +27,27 @@ app.get('/feed', async (req, res) => {
   }
 });
 
+app.delete('/user', async (req, res) => {
+  try {
+    const userId = req.body.id;
+    await User.findByIdAndDelete(userId);
+    res.status(200).send({ message: 'User deleted successfully' });
+  } catch (err) {
+    res.status(500).send({ message: 'Error deleting user', error: err });
+  }
+});
+
+app.patch('/user', async (req, res) => {
+  try {
+    const userId = req.body.id;
+    const updateData = req.body;
+    await User.findByIdAndUpdate({ _id: userId }, updateData);
+    res.status(200).send({ message: 'User updated successfully' });
+  } catch (error) {
+    res.status(500).send({ message: 'Error updating user', error });
+  }
+});
+
 connectDB()
   .then(() => {
     console.log('Connected to MongoDB');
