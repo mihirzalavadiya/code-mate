@@ -9,6 +9,7 @@ const {
   validateLoginData,
   validateEditProfileData,
 } = require('./utils/validation');
+const { userAuth } = require('./middlewares/auth');
 
 const app = express();
 
@@ -44,8 +45,10 @@ app.post('/login', async (req, res) => {
     const isPasswordValid = await user.validatePassword(password);
 
     if (isPasswordValid) {
-      const token = await jwt.sign({ _id: user._id }, process.env.JWT_SECRET);
-      res.cookie('token', token);
+      const token = await user.getJWT();
+      res.cookie('token', token, {
+        expires: new Date(Date.now() + 8 * 3600000),
+      });
       res.status(200).send({ message: 'Login successful' });
     } else {
       res.status(400).send({ message: 'Invalid credentials' });
@@ -55,26 +58,18 @@ app.post('/login', async (req, res) => {
   }
 });
 
-app.get('/profile', async (req, res) => {
+app.get('/profile', userAuth, async (req, res) => {
   try {
-    const token = req.cookies.token;
-    if (!token) {
-      return res.status(401).send({ message: 'Unauthorized' });
-    }
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded._id;
-    const user = await User.findById(userId).select('-password');
-    if (!user) {
-      return res.status(404).send({ message: 'User not found' });
-    }
-    const userProfile = {
+    const user = req.user;
+    const safeData = {
       firstName: user.firstName,
       lastName: user.lastName,
-      skills: user.skills,
       photoURL: user.photoURL,
+      skills: user.skills,
+      about: user.about,
     };
 
-    res.status(200).send(userProfile);
+    res.status(200).send(safeData);
   } catch (err) {
     res
       .status(500)
@@ -82,49 +77,60 @@ app.get('/profile', async (req, res) => {
   }
 });
 
-app.get('/feed', async (req, res) => {
+app.get('/feed', userAuth, async (req, res) => {
   try {
-    const users = await User.find();
+    const users = await User.find({ _id: { $ne: req.user._id } });
+
     const userFeed = users.map((user) => ({
+      _id: user._id,
       firstName: user.firstName,
       lastName: user.lastName,
       skills: user.skills,
       photoURL: user.photoURL,
+      about: user.about,
     }));
     res.status(200).send(userFeed);
   } catch (err) {
-    res.status(500).send({ error: err });
+    res
+      .status(500)
+      .send({ message: 'Error fetching feed', error: err.message });
   }
 });
 
-app.delete('/user', async (req, res) => {
+app.delete('/user', userAuth, async (req, res) => {
   try {
-    const userId = req.body.id;
+    const userId = req.user._id;
     await User.findByIdAndDelete(userId);
+    res.cookie('token', null, { expires: new Date(Date.now()) });
     res.status(200).send({ message: 'User deleted successfully' });
   } catch (err) {
     res.status(500).send({ message: 'Error deleting user', error: err });
   }
 });
 
-app.patch('/user/:userId', async (req, res) => {
+app.patch('/user/edit', userAuth, async (req, res) => {
   try {
-    const userId = req.params.userId;
-    const updateData = req.body;
-
     if (!validateEditProfileData(req)) {
       throw new Error('Invalid Update Request');
     }
-
-    await User.findByIdAndUpdate({ _id: userId }, updateData, {
-      runValidators: true,
+    const loggedInUser = req.user;
+    Object.keys(req.body).forEach((key) => (loggedInUser[key] = req.body[key]));
+    await loggedInUser.save();
+    res.status(200).send({
+      message: `${loggedInUser.firstName}, your profile updated successfully`,
     });
-    res.status(200).send({ message: 'User updated successfully' });
   } catch (error) {
     res
       .status(500)
       .send({ message: 'Error updating user', error: error.message });
   }
+});
+
+app.post('/logout', async (req, res) => {
+  res.cookie('token', null, {
+    expires: new Date(Date.now()),
+  });
+  res.send({ message: 'Logout Successful!!' });
 });
 
 connectDB()
