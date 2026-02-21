@@ -1,18 +1,52 @@
 const express = require('express');
 const connectDB = require('./config/database');
 const User = require('./models/user');
+const {
+  validateSignUpData,
+  validateLoginData,
+  validateEditProfileData,
+} = require('./utils/validation');
+const bycrypt = require('bcrypt');
 
 const app = express();
 
 app.use(express.json());
 
 app.post('/signup', async (req, res) => {
-  const user = new User(req.body);
   try {
+    validateSignUpData(req);
+    const { firstName, lastName, email, password } = req.body;
+    const hashedPassword = await bycrypt.hash(password, 10);
+    const user = new User({
+      firstName,
+      lastName,
+      email,
+      password: hashedPassword,
+    });
     await user.save();
-    res.status(201).send({ message: 'User created successfully', user });
+    res.status(201).send({ message: 'User created successfully' });
   } catch (err) {
     res.status(500).send({ message: 'Error saving user', error: err.message });
+  }
+});
+
+app.post('/login', async (req, res) => {
+  try {
+    validateLoginData(req);
+    const { email, password } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(400).send({ message: 'Invalid credentials' });
+    }
+    const isPasswordValid = await user.validatePassword(password);
+
+    if (isPasswordValid) {
+      res.status(200).send({ message: 'Login successful' });
+    } else {
+      res.status(400).send({ message: 'Invalid credentials' });
+    }
+  } catch (err) {
+    res.status(500).send({ message: 'Error logging in', error: err.message });
   }
 });
 
@@ -40,20 +74,8 @@ app.patch('/user/:userId', async (req, res) => {
     const userId = req.params.userId;
     const updateData = req.body;
 
-    const ALLOWED_UPDATE_FIELDS = [
-      'age',
-      'gender',
-      'skills',
-      'photoURL',
-      'about',
-    ];
-
-    const isAllowed = Object.keys(updateData).every((field) =>
-      ALLOWED_UPDATE_FIELDS.includes(field)
-    );
-
-    if (!isAllowed) {
-      throw new Error('Invalid update fields');
+    if (!validateEditProfileData(req)) {
+      throw new Error('Invalid Update Request');
     }
 
     await User.findByIdAndUpdate({ _id: userId }, updateData, {
