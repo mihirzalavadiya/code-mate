@@ -36,6 +36,11 @@ const userSchema = new mongoose.Schema(
         if (value.toLowerCase().includes('password')) {
           throw new Error('Password cannot contain the word "password"');
         }
+        if (!validator.isStrongPassword(value)) {
+          throw new Error(
+            'Password must be at least 8 characters long and include uppercase letters, lowercase letters, numbers, and symbols'
+          );
+        }
       },
     },
     age: {
@@ -63,6 +68,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       default:
         'https://www.citypng.com/photo/21035/hd-man-user-illustration-icon-transparent-png',
+      validate(value) {
+        if (!validator.isURL(value)) {
+          throw new Error('Invalid URL for photo');
+        }
+      },
     },
     about: {
       type: String,
