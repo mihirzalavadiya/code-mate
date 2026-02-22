@@ -5,16 +5,11 @@ const User = require('../models/user');
 
 const profileRouter = express.Router();
 
-profileRouter.get('/profile', userAuth, async (req, res) => {
+profileRouter.get('/profile/view', userAuth, async (req, res) => {
   try {
     const user = req.user;
-    const safeData = {
-      firstName: user.firstName,
-      lastName: user.lastName,
-      photoURL: user.photoURL,
-      skills: user.skills,
-      about: user.about,
-    };
+    const { password, __v, createdAt, updatedAt, ...safeData } =
+      user.toObject();
 
     res.status(200).send(safeData);
   } catch (err) {
@@ -24,7 +19,7 @@ profileRouter.get('/profile', userAuth, async (req, res) => {
   }
 });
 
-profileRouter.delete('/user', userAuth, async (req, res) => {
+profileRouter.delete('/profile/remove', userAuth, async (req, res) => {
   try {
     const userId = req.user._id;
     await User.findByIdAndDelete(userId);
@@ -35,7 +30,7 @@ profileRouter.delete('/user', userAuth, async (req, res) => {
   }
 });
 
-profileRouter.patch('/user/edit', userAuth, async (req, res) => {
+profileRouter.patch('/profile/update', userAuth, async (req, res) => {
   try {
     if (!validateEditProfileData(req)) {
       throw new Error('Invalid Update Request');
@@ -43,8 +38,11 @@ profileRouter.patch('/user/edit', userAuth, async (req, res) => {
     const loggedInUser = req.user;
     Object.keys(req.body).forEach((key) => (loggedInUser[key] = req.body[key]));
     await loggedInUser.save();
+    const { password, __v, createdAt, updatedAt, ...safeData } =
+      loggedInUser.toObject();
     res.status(200).send({
-      message: `${loggedInUser.firstName}, your profile updated successfully`,
+      message: `${safeData.firstName}, your profile updated successfully`,
+      data: safeData,
     });
   } catch (error) {
     res
