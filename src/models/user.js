@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
+      unique: true, // no need to index = true beacuse unique already creates an index
       lowercase: true,
       trim: true,
       validate(value) {
